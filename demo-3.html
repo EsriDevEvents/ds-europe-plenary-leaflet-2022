@@ -85,8 +85,8 @@
  
 // Add a feature layer, display a popup
     const listings = featureLayer({
-      url: "https://services9.arcgis.com/kAq0la06rYAyTcgX/arcgis/rest/services/listings/FeatureServer/0",
-      token: apiKey
+      url: "SERVICE_URL",
+      token: apiKey //If your layer is private
     }).addTo(map);
 
     listings.bindPopup((layer)=> {
