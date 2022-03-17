@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Demo 1: Original Leaflet App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+
+  <!-- Load Leaflet code library - see updates at http://leafletjs.com/download.html -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css"
+  integrity="sha512-NhSC1YmyruXifcj/KFRWoC561YpHpc5Jtzgvbuzx5VozKpWvQ+4nXhPdFgmx8xqexRcpAglTj9sIBWINXa8x5w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+  <!-- Position the map with Cascading Style Sheet (CSS) -->
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      left: 0;
+    }
+  </style>
+
+</head>
+
+<body>
+
+  <!-- Insert HTML division tag to layout the map -->
+  <div id="map"></div>
+
+  <!-- Insert Javascript (.js) code to create the map -->
+  <script type="module">
+    import L from "leaflet";
+    import data from "url:./listings.csv";
+    import Papa from "papaparse";
+
+    const map = L.map('map', {
+      center: [41.57, -72.69], 
+      zoom: 4, 
+    });
+
+    // add the OpenStreetMap tiles
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+    }).addTo(map);
+
+    L.control.scale({ imperial: true, metric: true }).addTo(map);
+
+    // see more basemap options at https://leaflet-extras.github.io/leaflet-providers/preview/
+
+      fetch(data).then(response => {
+        return response.text();
+      }).then(csvString => {
+        var data = Papa.parse(csvString, { header: true, dynamicTyping: true }).data;
+        var latlngs = [];
+        data.forEach((row)=>{
+          if (row.x && row.y) {
+            var latlng = [row.y, row.x];
+            var marker = L.marker(latlng, {
+              opacity: 1
+            }).bindPopup(() => {
+              const cost = row.rate === "Upon Request" ? "Upon Request" : `$${row.rate} / Sq Ft. / Year`;
+              return document.createRange().createContextualFragment(`
+              <div class="popup-content">
+                <h3>${row.address}</h3>
+                <b><i><em>${row.type}</em></i></b>:   <i>${row.subtype}</i>
+                <dl>
+                  <b><dt>Rate:</dt></b>
+                  <dd>${cost}</dd>
+                  <b><dt>Size:</dt></b>
+                  <dd>${row.size} Sq Ft.</dd>
+              </div>
+              `);
+            }).bindTooltip(() => {
+              return row.address;
+            });
+            latlngs.push(latlng);
+          }
+          marker.addTo(map);
+        });
+        map.fitBounds(L.latLngBounds(latlngs));
+      });
+
+  </script>
+</body>
+
+</html>

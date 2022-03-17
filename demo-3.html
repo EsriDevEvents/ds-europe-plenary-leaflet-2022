@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Demo 3: Hosted Feature Layer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+
+  <!-- Load Leaflet code library - see updates at http://leafletjs.com/download.html -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css"
+  integrity="sha512-NhSC1YmyruXifcj/KFRWoC561YpHpc5Jtzgvbuzx5VozKpWvQ+4nXhPdFgmx8xqexRcpAglTj9sIBWINXa8x5w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <link rel="stylesheet" href="https://unpkg.com/esri-leaflet-geocoder@3.1.1/dist/esri-leaflet-geocoder.css" crossorigin="" />
+
+
+  <!-- Position the map with Cascading Style Sheet (CSS) -->
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      left: 0;
+    }
+    #query {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: white;
+        padding: 1em;
+      }
+
+      #query select {
+        font-size: 16px;
+      }
+  </style>
+
+</head>
+
+<body>
+
+  <!-- Insert HTML division tag to layout the map -->
+  <div id="map"></div>
+  <div id="query" class="leaflet-bar">
+    <label>
+      Property subtype:
+      <select id="buildingType">
+        <option value="1=1">All</option>
+        <option value="subtype='Restaurant'">Restaurant</option>
+        <option value="subtype='Storefront'">Storefront</option>
+      </select>
+    </label>
+  </div>
+  <!-- Insert Javascript (.js) code to create the map -->
+  <script type="module">
+    import L from "leaflet";
+    import data from "url:./listings.csv";
+    import Papa from "papaparse";
+    import { vectorBasemapLayer } from "esri-leaflet-vector";
+    import { featureLayer } from "esri-leaflet";
+
+    // Set up initial map center and zoom level
+    const map = L.map('map', {
+      center: [33.804, -117.875], // EDIT latitude, longitude to re-center map
+      zoom: 14,  // EDIT from 1 to 18 -- decrease to zoom out, increase to zoom in
+    });
+
+    const apiKey = "YOUR_API_KEY";
+
+    vectorBasemapLayer("ArcGIS:Community", {
+      apiKey
+    }).addTo(map);    
+
+  // Fetch data from local CSV file   
+ 
+// Add a feature layer, display a popup
+    const listings = featureLayer({
+      url: "https://services9.arcgis.com/kAq0la06rYAyTcgX/arcgis/rest/services/listings/FeatureServer/0",
+      token: apiKey
+    }).addTo(map);
+
+    listings.bindPopup((layer)=> {
+      const {rate, address, type, subtype, size} = layer.feature.properties;
+      const cost = rate === "Upon Request" ? "Upon Request" : `$${rate} / Sq Ft. / Year`;
+      return document.createRange().createContextualFragment(`
+      <div class="popup-content">
+        <h3>${address}</h3>
+        <b><i><em>${type}</em></i></b>: <i>${subtype}</i>
+        <dl>
+          <b><dt>Rate:</dt></b>
+          <dd>${cost}</dd>
+          <b><dt>Size:</dt></b>
+          <dd>${size} Sq Ft.</dd>
+      </div>
+      `);
+    });
+
+// SQL query
+  const buildingSubtype = document.getElementById("buildingType");
+
+  buildingSubtype.addEventListener("change",()=>{
+    listings.setWhere(buildingSubtype.value);
+  });
+
+    // show the scale bar on the lower left corner
+    L.control.scale({ imperial: true, metric: true }).addTo(map);
+
+    listings.query().bounds(function (error, latlngbounds) {
+      map.fitBounds(L.latLngBounds(latlngbounds));
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "dev-summit-2022-demo",
+  "version": "1.0.0",
+  "description": "",
+  "source": "index.html",
+  "scripts": {
+    "start": "parcel",
+    "build": "parcel build",
+    "deploy": "surge dist os-dev-summit-2022.surge.sh"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@esri/arcgis-rest-auth": "^3.4.3",
+    "@esri/arcgis-rest-demographics": "^3.4.3",
+    "@esri/arcgis-rest-request": "^3.4.3",
+    "esri-leaflet": "^3.0.4",
+    "esri-leaflet-geocoder": "^3.1.1",
+    "esri-leaflet-vector": "^3.1.1",
+    "leaflet": "^1.7.1",
+    "papaparse": "^5.3.1"
+  },
+  "devDependencies": {
+    "parcel": "^2.2.1",
+    "surge": "^0.23.1"
+  }
+}

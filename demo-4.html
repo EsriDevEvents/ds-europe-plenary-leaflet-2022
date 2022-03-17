@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Demo 4: Enrich Data</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+
+  <!-- Load Leaflet code library - see updates at http://leafletjs.com/download.html -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css"
+  integrity="sha512-NhSC1YmyruXifcj/KFRWoC561YpHpc5Jtzgvbuzx5VozKpWvQ+4nXhPdFgmx8xqexRcpAglTj9sIBWINXa8x5w=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <!-- Position the map with Cascading Style Sheet (CSS) -->
+  <style>
+    body {
+      font-family: sans-serif;
+      font-size: 0.825rem;
+      margin: 0;
+      padding: 0;
+    }
+
+    #map {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      left: 0;
+    }
+
+    #panel {
+      display: none;
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: 0;
+      width: 320px;
+      padding: 1rem;
+      box-sizing: border-box;
+      border-left: 1px solid lightgray;
+    }
+
+    table {
+      border: 1px solid lightgray;
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    td {
+      border: 1px solid lightgray;
+      padding: 0.5rem;
+    }
+
+    td + td {
+      font-weight: bold;
+    }
+
+    tr:nth-child(even) {
+      background-color: #F6F6F6;
+    }
+
+    body.panel-active #map {
+      right: 320px;
+    }
+
+    body.panel-active #panel {
+      display: block;
+    }
+
+    h3 {
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+
+    dl {
+      width: 100%;
+      overflow: hidden;
+      padding: 0;
+      margin-top: 1rem;
+    }
+
+    dt {
+      float: left;
+      width: 50%;
+      padding: 0;
+      margin: 0;
+    }
+
+    dd {
+      float: left;
+      width: 50%;
+      padding: 0;
+      margin: 0;
+      font-weight: bold;
+    }
+
+    small {
+      color: #5D5D5D;
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Insert HTML division tag to layout the map -->
+  <div id="map"></div>
+  <div id="panel"></div>
+
+  <!-- Insert Javascript (.js) code to create the map -->
+  <script type="module">
+    import L from "leaflet";
+    import data from "url:./listings.csv";
+    import Papa from "papaparse";
+    import { vectorBasemapLayer } from "esri-leaflet-vector";
+    import { featureLayer, Util } from "esri-leaflet";
+    import {ApiKey} from "@esri/arcgis-rest-auth";
+    import { queryDemographicData } from '@esri/arcgis-rest-demographics';
+
+    // Set up initial map center and zoom level
+    const map = L.map('map', {
+      center: [33.804, -117.875], // EDIT latitude, longitude to re-center map
+      zoom: 14,  // EDIT from 1 to 18 -- decrease to zoom out, increase to zoom in
+    });
+    
+    const apiKey = "YOUR_API_KEY";
+
+    vectorBasemapLayer("ArcGIS:Community", {
+      apiKey
+    }).addTo(map);
+
+    // Access the feature layer
+    const listings = featureLayer({
+      url: "https://services9.arcgis.com/kAq0la06rYAyTcgX/arcgis/rest/services/listings/FeatureServer/0",
+      token: apiKey
+    }).addTo(map);
+
+    // listings.setWhere("subtype='Restaurant'");
+
+    let activeArea;
+
+    listings.on("click", (e) => {
+      const layer = e.layer;
+      const {lat, lng} = layer.getLatLng();
+
+// Via ArcGIS REST JS
+      queryDemographicData({
+        authentication: new ApiKey({
+          key: apiKey
+        }),
+        studyAreas: [
+          { 
+            "geometry": { 
+              "x":lng, 
+              "y": lat 
+            }, 
+            "areaType": "NetworkServiceArea",
+           "bufferUnits": "Minutes", 
+           "bufferRadii": [5], 
+           "travel_mode": "Driving"
+          }
+        ],
+        analysisVariables: [
+          "AVGHINC_CY", // 2021 Average Household Income
+          "AVGVAL_CY", // 2021 Average Home Value
+          "PCI_CY", // 2021 Per Capita Income
+          "POPGRW10CY", // 2010-2021 Growth Rate: Population
+          "TOTPOP_CY", // 2021 Total Population
+          "DIVINDX_CY", // 2021 Diversity Index
+          "X1131_I", // 2021 Index: Meals at Restaurants/Other
+          "X1131_X", // 2021 Meals at Restaurants/Other
+          "SpendingTotal.X15001_X", // 2021 Retail Goods
+          "SpendingTotal.X15001_I" // 2021 Retail Goods Index
+        ],
+        returnGeometry: true
+      })
+        .then((response) => {
+          const { rate, address, type, subtype, size } = layer.feature.properties;
+          const enrichmentFeature = Util.arcgisToGeoJSON(response.results[0].value.FeatureSet[0]).features[0];
+          const cost = rate === "Upon Request" ? "Upon Request" : `$${rate.toLocaleString()} / Sq Ft. / Year`;
+          const content = `
+            <div id="${layer.feature.id}" class="popup-content">
+              <h1>${address}</h1> 
+              <i><em>${type}</em></i>: <i>${subtype}</i>
+              <dl>
+                <dt>Rate:</dt>
+                <dd>${cost}</dd>
+                <dt>Size:</dt>
+                <dd>${size.toLocaleString()} Sq Ft.</dd>
+              </dl>
+              <h2>Retail Spending</h2>
+              <table>
+                <tbody>
+                  <tr>
+                    <td>2021 Retail Goods</td>
+                    <td>${enrichmentFeature.properties.X15001_X.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td>2021 Retail Goods Index</td>
+                    <td>${enrichmentFeature.properties.X15001_I}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h2>Restaurant Spending</h2>
+              <table>
+                <tbody>
+                  <tr>
+                    <td>2021 Meals at Restaurants/Other</td>
+                    <td>$${enrichmentFeature.properties.X1131_X.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td>2021 Index: Meals at Restaurants/Other</td>
+                    <td>${enrichmentFeature.properties.X1131_I}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h2>Population and Diversity</h2>
+              <table>
+                <tbody>
+                  <tr>
+                    <td>2021 Diversity Index</td>
+                    <td>${enrichmentFeature.properties.DIVINDX_CY}</td>
+                  </tr>
+                  <tr>
+                    <td>2021 Total Population</td>
+                    <td>${enrichmentFeature.properties.TOTPOP_CY.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td>2010-2021 Growth Rate: Population</td>
+                    <td>${enrichmentFeature.properties.POPGRW10CY}%</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h2>Income and Wealth</h2>
+              <table>
+                <tbody>
+                  <tr>
+                    <td>2021 Per Capita Income</td>
+                    <td>$${enrichmentFeature.properties.PCI_CY}</td>
+                  </tr>
+                  <tr>
+                    <td>2021 Average Home Value</td>
+                    <td>$${enrichmentFeature.properties.AVGVAL_CY.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <td>2021 Average Household Income</td>
+                    <td>$${enrichmentFeature.properties.AVGHINC_CY.toLocaleString()}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            `
+          const dom = document.createRange().createContextualFragment(content);
+
+          const panel = document.getElementById("panel");
+
+         function removeAllChildNodes(parent) {
+            while (parent.firstChild) {
+              parent.removeChild(parent.firstChild);
+            }
+          }
+          removeAllChildNodes(panel)
+          panel.appendChild(dom);
+
+          document.body.classList.add("panel-active");
+
+          if(activeArea) {
+            map.removeLayer(activeArea);
+            activeArea = null;
+          }
+
+          activeArea = new L.GeoJSON(enrichmentFeature, {
+            style: function (feature) {
+              return { color: "#50a14f", fill: "#50a14f" };
+            }
+          })
+          
+          activeArea.addTo(map);
+          map.invalidateSize();
+          map.flyToBounds(activeArea.getBounds());
+        }).catch(error => {
+          console.log(error);
+        });
+    });
+
+    // show the scale bar on the lower left corner
+    L.control.scale({ imperial: true, metric: true }).addTo(map);
+
+    listings.query().bounds(function (error, latlngbounds) {
+      map.fitBounds(L.latLngBounds(latlngbounds));
+    });
+  </script>
+</body>
+
+</html>
